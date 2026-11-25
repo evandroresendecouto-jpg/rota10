@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-title" content="Rota10">
 <title>Rota10</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
   :root {
     --bg: #F2F6F3; --surface: #FFFFFF; --fg: #0F1F18; --muted: #566860; --line: #D5E0DA;
@@ -93,6 +95,21 @@
   .center { min-height: 50vh; display: grid; place-items: center; color: var(--muted); }
   .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); max-width: min(92vw, 460px); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 14px; z-index: 20; }
   a { color: var(--brand); font-weight: 600; }
+  a.btn { display: flex; align-items: center; justify-content: center; text-align: center; text-decoration: none; line-height: 1.25; padding-block: 8px; }
+  .btn.sos { background: #C62828; color: #fff; border-color: #C62828; }
+  .sosgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .sosgrid .wide { grid-column: 1 / -1; }
+  .mapbox { position: relative; z-index: 0; isolation: isolate; height: 280px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--bg); }
+  .mk { background: none; border: 0; }
+  .pin { font-size: 26px; line-height: 34px; text-align: center; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+  .drv { display: flex; gap: 12px; align-items: center; }
+  .avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 2px solid var(--line); flex: none; background: var(--bg); }
+  .carimg { display: block; width: 100%; max-height: 180px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); margin-top: 10px; }
+  .plate { display: inline-block; font: 700 18px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .08em; padding: 6px 10px; border: 2px solid #111; border-radius: 6px; background: #fff; color: #111; }
+  .photos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .photobox { border: 1px dashed var(--line); border-radius: 10px; padding: 8px; text-align: center; font-size: 13px; color: var(--muted); min-width: 0; }
+  .photobox img, .photobox .ph { width: 100%; height: 110px; object-fit: cover; border-radius: 8px; display: grid; place-items: center; margin-bottom: 6px; background: var(--bg); }
+  .photobox label { cursor: pointer; color: var(--brand); font-weight: 600; display: block; padding: 6px 0; }
 </style>
 </head>
 <body>
@@ -133,6 +150,30 @@ const parseMoney = (s) => { const n = parseFloat(String(s).replace(/\./g, '').re
 const ms = (r) => (r.createdAt && r.createdAt.toDate ? r.createdAt.toDate().getTime() : Date.now());
 const when = (r) => new Date(ms(r)).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 const waLink = (phone) => { const d = String(phone || '').replace(/\D/g, ''); if (d.length < 10) return ''; return 'https://wa.me/' + (d.length <= 11 ? '55' + d : d); };
+const plateFmt = (p) => String(p || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const PLATE_RE = /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/;
+const safeImg = (s) => (typeof s === 'string' && s.startsWith('data:image/jpeg;base64,') ? s : '');
+const telHref = (phone) => { const d = String(phone || '').replace(/\D/g, ''); if (d.length < 10) return ''; return 'tel:+' + (d.length <= 11 ? '55' + d : d); };
+const dist = (a, b, c, d) => { const R = 6371, t = (x) => x * Math.PI / 180, dl = t(c - a), dg = t(d - b); const h = Math.sin(dl / 2) ** 2 + Math.cos(t(a)) * Math.cos(t(c)) * Math.sin(dg / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+const kmFmt = (k) => (k < 1 ? Math.round(k * 1000 / 10) * 10 + ' m' : k.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' km');
+function resizeImage(file, max, q, square) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const sw = square ? Math.min(img.width, img.height) : img.width, sh = square ? sw : img.height;
+      const sx = square ? (img.width - sw) / 2 : 0, sy = square ? (img.height - sh) / 2 : 0;
+      const s = Math.min(1, max / Math.max(sw, sh)), w = Math.round(sw * s), h = Math.round(sh * s);
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+      let out = c.toDataURL('image/jpeg', q);
+      while (out.length > 130000 && q > 0.3) { q -= 0.1; out = c.toDataURL('image/jpeg', q); }
+      resolve(out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('img')); };
+    img.src = url;
+  });
+}
 const friendly = (e) => {
   const c = (e && e.code) || '';
   const map = {
@@ -153,7 +194,8 @@ const friendly = (e) => {
 };
 
 /* ---------- estado ---------- */
-const S = { view: 'loading', mode: 'login', role: 'passenger', user: null, profile: null, rides: [], open: [], err: '', banner: '', busy: false, toast: '' };
+const S = { view: 'loading', mode: 'login', role: 'passenger', user: null, profile: null, rides: [], open: [], err: '', banner: '', busy: false, toast: '',
+  draft: { face: null, car: null }, editVehicle: false, editEmerg: false, pickup: null, myPos: null };
 let pendingProfile = null;
 let unsubs = [];
 const $app = document.getElementById('app');
@@ -168,6 +210,81 @@ const contact = (name, phone) => {
   const w = waLink(phone);
   return '<div class="small"><b>' + esc(name || '') + '</b>' + (phone ? ' · ' + esc(phone) : '') + (w ? ' · <a href="' + w + '" target="_blank" rel="noopener">WhatsApp</a>' : '') + '</div>';
 };
+
+const DRIVER_ACTIVE = ['accepted', 'arrived', 'ongoing'];
+const activeRide = () => {
+  if (!S.profile) return null;
+  const list = S.rides.slice().sort((a, b) => ms(b) - ms(a));
+  const set = S.profile.role === 'driver' ? DRIVER_ACTIVE : ACTIVE;
+  return list.find((r) => set.includes(r.status)) || null;
+};
+
+function drvCard(r) {
+  const face = safeImg(r.driverPhoto), car = safeImg(r.carPhoto), w = waLink(r.driverPhone);
+  return '<div class="drv">' + (face ? '<img class="avatar" src="' + esc(face) + '" alt="Foto do motorista">' : '') +
+    '<div style="min-width:0"><b>' + esc(r.driverName) + '</b>' +
+    '<div class="small muted">' + esc([r.carBrand, r.carModel, r.carColor].filter(Boolean).join(' · ')) + '</div>' +
+    (r.carPlate ? '<div style="margin-top:6px"><span class="plate">' + esc(r.carPlate) + '</span></div>' : '') + '</div></div>' +
+    (car ? '<img class="carimg" src="' + esc(car) + '" alt="Foto do carro">' : '') +
+    '<div class="small" style="margin-top:8px">' + (r.driverPhone ? esc(r.driverPhone) : '') + (w ? ' · <a href="' + w + '" target="_blank" rel="noopener">WhatsApp</a>' : '') + '</div>';
+}
+
+function mapInfoText(r) {
+  if (!r) return '';
+  if (r.status === 'ongoing') return 'Em viagem.';
+  if (S.profile.role === 'driver') {
+    if (!S.myPos) return 'Buscando o seu GPS…';
+    if (r.pickupLat != null) return 'Passageiro a ' + kmFmt(dist(S.myPos.lat, S.myPos.lng, r.pickupLat, r.pickupLng)) + ' de você.';
+    return 'Sua localização está sendo enviada ao passageiro.';
+  }
+  if (r.driverLat == null) return 'Aguardando o motorista começar o deslocamento.';
+  const age = r.locAt && r.locAt.toDate ? Math.round((Date.now() - r.locAt.toDate().getTime()) / 60000) : 0;
+  const base = r.pickupLat != null ? 'Motorista a ' + kmFmt(dist(r.driverLat, r.driverLng, r.pickupLat, r.pickupLng)) + ' de você.' : 'Motorista a caminho.';
+  return base + (age >= 2 ? ' Última posição há ' + age + ' min.' : '');
+}
+
+const mapCard = (r) => '<div class="card"><div id="mapslot" class="mapbox"></div><div class="callrow small" style="margin-top:8px"><span id="mapinfo">' + esc(mapInfoText(r)) + '</span><button class="link" data-act="recenter">Centralizar</button></div></div>';
+
+function photoBox(kind, label, src) {
+  return '<div class="photobox">' + (src ? '<img src="' + esc(src) + '" alt="' + esc(label) + '">' : '<div class="ph">Sem foto</div>') +
+    '<label>' + (src ? 'Trocar: ' : 'Escolher: ') + esc(label) + '<input type="file" accept="image/*" data-photo="' + kind + '" hidden></label></div>';
+}
+
+function vehicleForm(p, first) {
+  const face = safeImg(S.draft.face) || safeImg(p.photo), car = safeImg(S.draft.car) || safeImg(p.carPhoto);
+  const v = (x) => ' value="' + esc(x || '') + '"';
+  return '<form class="card" data-form="vehicle"><h2>' + (first ? 'Cadastre seu veículo' : 'Seu veículo') + '</h2>' +
+    '<p class="small muted" style="margin-top:0">O passageiro vê sua foto, o carro e a placa quando você aceita a corrida.</p>' +
+    '<div class="photos">' + photoBox('face', 'sua foto', face) + photoBox('car', 'foto do carro', car) + '</div>' +
+    '<label class="field">Marca<input type="text" name="carBrand" required maxlength="30" placeholder="Ex.: Chevrolet"' + v(p.carBrand) + '></label>' +
+    '<label class="field">Modelo<input type="text" name="carModel" required maxlength="30" placeholder="Ex.: Onix"' + v(p.carModel) + '></label>' +
+    '<label class="field">Cor<input type="text" name="carColor" required maxlength="20" placeholder="Ex.: Prata"' + v(p.carColor) + '></label>' +
+    '<label class="field">Placa<input type="text" name="carPlate" required maxlength="8" autocapitalize="characters" autocomplete="off" placeholder="ABC1D23"' + v(p.carPlate) + '></label>' +
+    '<div class="btns"><button class="btn primary"' + (S.busy ? ' disabled' : '') + '>Salvar veículo</button>' +
+    (first ? '' : '<button type="button" class="btn ghost" data-act="close-vehicle">Cancelar</button>') + '</div></form>';
+}
+
+function panicCard() {
+  const p = S.profile, num = telHref(p.emergencyPhone), has = !!num;
+  let h = '<div class="card"><h2>Segurança</h2><div class="sosgrid">' +
+    '<a class="btn sos" href="tel:190">🚓 Polícia<br>190</a>' +
+    '<a class="btn sos" href="tel:193">🚒 Bombeiros<br>193</a>';
+  if (has) {
+    h += '<a class="btn sos wide" href="' + num + '">📞 Ligar para ' + esc(p.emergencyName || 'meu contato') + '</a>' +
+      '<button class="btn ghost wide" data-act="sos-wa">💬 Enviar minha localização por WhatsApp</button>';
+  } else if (!S.editEmerg) {
+    h += '<button class="btn ghost wide" data-act="edit-emerg">➕ Escolher meu contato de emergência</button>';
+  }
+  h += '</div>';
+  if (S.editEmerg) {
+    h += '<form data-form="emerg" style="margin-top:12px"><label class="field">Nome do contato<input type="text" name="ename" required maxlength="40" placeholder="Ex.: Ana Carla" value="' + esc(p.emergencyName || '') + '"></label>' +
+      '<label class="field">Celular com DDD<input type="tel" name="ephone" required inputmode="tel" maxlength="20" placeholder="(34) 99999-9999" value="' + esc(p.emergencyPhone || '') + '"></label>' +
+      '<div class="btns"><button class="btn primary"' + (S.busy ? ' disabled' : '') + '>Salvar contato</button><button type="button" class="btn ghost" data-act="close-emerg">Cancelar</button></div></form>';
+  } else if (has) {
+    h += '<button class="link" data-act="edit-emerg">Alterar contato de emergência</button>';
+  }
+  return h + '<p class="small muted" style="margin:8px 0 0">Os botões abrem o discador do celular e você confirma a ligação. Ambulância (SAMU): <a href="tel:192">192</a>.</p></div>';
+}
 
 function authView() {
   const su = S.mode === 'signup';
@@ -205,22 +322,25 @@ function passengerView() {
   let top = '';
   if (act) {
     top = '<div class="card hl"><div class="callrow"><h2>' + STATUS[act.status] + (act.status === 'searching' ? '…' : '') + '</h2><span class="pill on">' + when(act) + '</span></div>' + route(act) +
-      (act.driverId ? '<p class="small muted" style="margin:8px 0 2px">Seu motorista</p>' + contact(act.driverName, act.driverPhone) : '<p class="muted small">Aguardando um motorista aceitar. Pode levar alguns minutos.</p>') +
+      (act.driverId ? '<p class="small muted" style="margin:8px 0 8px">Seu motorista</p>' + drvCard(act) : '<p class="muted small">Aguardando um motorista aceitar. Pode levar alguns minutos.</p>') +
       (act.cents ? '<div class="callrow" style="margin-top:12px"><div><div class="price">' + fmt(act.cents) + '</div><div class="small muted">Valor combinado</div></div></div>' +
         '<p class="small muted">Neste teste o pagamento é feito direto ao motorista, por Pix ou dinheiro.</p>' : '') +
-      (['searching', 'accepted', 'arrived'].includes(act.status) ? '<div class="btns"><button class="btn danger" data-act="cancel" data-id="' + act.id + '"' + (S.busy ? ' disabled' : '') + '>Cancelar corrida</button></div>' : '') + '</div>';
+      (['searching', 'accepted', 'arrived'].includes(act.status) ? '<div class="btns"><button class="btn danger" data-act="cancel" data-id="' + act.id + '"' + (S.busy ? ' disabled' : '') + '>Cancelar corrida</button></div>' : '') + '</div>' +
+      ((act.pickupLat != null || act.driverLat != null) ? mapCard(act) : '');
   } else {
     top = '<form class="card" data-form="request"><h2>Para onde vamos?</h2>' +
       '<label class="field">Embarque (rua e número, ou ponto de referência)<input type="text" name="from" required maxlength="120" autocomplete="off"></label>' +
       '<label class="field">Destino<input type="text" name="to" required maxlength="120" autocomplete="off"></label>' +
       '<label class="field">Observação (opcional)<input type="text" name="note" maxlength="120" autocomplete="off" placeholder="Ex.: estou de camisa azul no portão"></label>' +
-      '<p class="small muted" style="margin:0 0 4px">O motorista que aceitar define o valor da corrida. Você vê o valor aqui e pode cancelar antes de ele chegar.</p>' +
+      '<button type="button" class="btn ghost" data-act="use-loc">📍 Usar minha localização atual</button>' +
+      (S.pickup ? '<p class="small" style="color:var(--brand);margin:8px 0 0">Localização capturada ✓ O motorista verá seu ponto no mapa.</p>' : '<p class="small muted" style="margin:8px 0 0">Com a localização, o motorista te encontra pelo mapa.</p>') +
+      '<p class="small muted" style="margin:10px 0 4px">O motorista que aceitar define o valor da corrida. Você vê o valor aqui e pode cancelar antes de ele chegar.</p>' +
       '<div class="btns"><button class="btn primary"' + (S.busy ? ' disabled' : '') + '>Pedir corrida</button></div></form>';
   }
   const hist = past.length ? '<div class="card"><h2>Corridas anteriores</h2><ul class="list">' + past.map((r) =>
     '<li><div class="callrow"><span class="small muted">' + when(r) + '</span><span class="pill ' + (r.status === 'done' ? 'on' : 'bad') + '">' + STATUS[r.status] + '</span></div>' + route(r) +
     (r.cents && r.status === 'done' ? '<div class="small">Valor: <b>' + fmt(r.cents) + '</b></div>' : '') + '</li>').join('') + '</ul></div>' : '';
-  return top + hist;
+  return top + panicCard() + hist;
 }
 
 function driverView() {
@@ -230,15 +350,23 @@ function driverView() {
   const done = rides.filter((r) => r.status === 'done');
   const gross = done.reduce((a, r) => a + (r.cents || 0), 0);
   const fee = done.reduce((a, r) => a + (r.feeCents || 0), 0);
-  let html = '<div class="card"><div class="callrow"><h2 style="margin:0">Você está ' + (p.online ? 'online' : 'offline') + '</h2><span class="pill ' + (p.online ? 'on' : '') + '">' + (p.online ? 'Online' : 'Offline') + '</span></div>' +
-    '<div class="btns"><button class="btn ' + (p.online ? 'ghost' : 'primary') + '" data-act="toggle-online">' + (p.online ? 'Ficar offline' : 'Ficar online') + '</button></div></div>';
+  const pend = done.filter((r) => !r.feePaid).reduce((a, r) => a + (r.feeCents || 0), 0);
+  if (!p.vehicleOk) return vehicleForm(p, true);
+  let html = (S.editVehicle ? vehicleForm(p, false) : '') +
+    '<div class="card"><div class="callrow"><h2 style="margin:0">Você está ' + (p.online ? 'online' : 'offline') + '</h2><span class="pill ' + (p.online ? 'on' : '') + '">' + (p.online ? 'Online' : 'Offline') + '</span></div>' +
+    '<div class="btns"><button class="btn ' + (p.online ? 'ghost' : 'primary') + '" data-act="toggle-online">' + (p.online ? 'Ficar offline' : 'Ficar online') + '</button></div>' +
+    '<button class="link" data-act="edit-vehicle">Editar meu veículo (' + esc(p.carModel) + ' · ' + esc(p.carPlate) + ')</button></div>';
   if (act) {
     const nx = NEXT[act.status];
+    const navDest = act.status === 'ongoing' ? act.to + ', Uberlândia, MG' : (act.pickupLat != null ? act.pickupLat + ',' + act.pickupLng : act.from + ', Uberlândia, MG');
+    const navUrl = 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' + encodeURIComponent(navDest);
     html += '<div class="card hl"><div class="callrow"><h2>' + STATUS[act.status] + '</h2><span class="pill on">' + fmt(act.cents) + '</span></div>' + route(act) +
       '<p class="small muted" style="margin:8px 0 2px">Passageiro</p>' + contact(act.passengerName, act.passengerPhone) +
       (act.note ? '<p class="note">' + esc(act.note) + '</p>' : '') +
       '<div class="small" style="margin-top:8px">Você recebe <b>' + fmt(act.netCents) + '</b> · taxa Rota10 <b>' + fmt(act.feeCents) + '</b> (10%)</div>' +
-      '<div class="btns"><button class="btn primary" data-act="advance" data-id="' + act.id + '" data-to="' + nx.to + '"' + (S.busy ? ' disabled' : '') + '>' + nx.label + '</button></div></div>';
+      '<div class="btns"><button class="btn primary" data-act="advance" data-id="' + act.id + '" data-to="' + nx.to + '"' + (S.busy ? ' disabled' : '') + '>' + nx.label + '</button>' +
+      '<a class="btn ghost" href="' + esc(navUrl) + '" target="_blank" rel="noopener">🧭 Abrir rota no Google Maps</a></div></div>' + mapCard(act) +
+      '<p class="small muted" style="margin:0">Mantenha esta tela aberta e o GPS ligado para o passageiro te acompanhar.</p>';
   } else if (p.online) {
     const open = sorted(S.open.filter((r) => r.status === 'searching'));
     html += open.length ? open.map((r) =>
@@ -254,11 +382,11 @@ function driverView() {
     '<div class="kpi"><div class="v">' + done.length + '</div><div class="l">Corridas finalizadas</div></div>' +
     '<div class="kpi"><div class="v">' + fmt(gross) + '</div><div class="l">Total das corridas</div></div>' +
     '<div class="kpi"><div class="v">' + fmt(gross - fee) + '</div><div class="l">Você ficou com (90%)</div></div>' +
-    '<div class="kpi fee"><div class="v">' + fmt(fee) + '</div><div class="l">Taxa Rota10 a repassar (10%)</div></div></div>' +
-    '<p class="small muted" style="margin:10px 0 0">Neste teste o passageiro paga direto a você. Combine com o Evandro como repassar a taxa de 10%.</p></div>';
+    '<div class="kpi fee"><div class="v">' + fmt(pend) + '</div><div class="l">Taxa Rota10 pendente (10%)</div></div></div>' +
+    '<p class="small muted" style="margin:10px 0 0">Neste teste o passageiro paga direto a você. Repasse a taxa de 10% ao Evandro; ele marca como recebida aqui.</p></div>';
   if (done.length) {
     html += '<div class="card"><h2>Corridas finalizadas</h2><ul class="list">' + done.slice(0, 10).map((r) =>
-      '<li><div class="callrow"><span class="small muted">' + when(r) + '</span><b>' + fmt(r.cents) + '</b></div>' + route(r) + '</li>').join('') + '</ul></div>';
+      '<li><div class="callrow"><span class="small muted">' + when(r) + '</span><span><b>' + fmt(r.cents) + '</b> <span class="pill ' + (r.feePaid ? 'on' : 'fee') + '">' + (r.feePaid ? 'taxa paga' : 'taxa pendente') + '</span></span></div>' + route(r) + '</li>').join('') + '</ul></div>';
   }
   return html;
 }
@@ -269,18 +397,21 @@ function adminView() {
   const gross = done.reduce((a, r) => a + (r.cents || 0), 0);
   const fee = done.reduce((a, r) => a + (r.feeCents || 0), 0);
   const by = {};
-  done.forEach((r) => { const k = r.driverId || '?'; if (!by[k]) by[k] = { name: r.driverName, n: 0, gross: 0, fee: 0 }; by[k].n++; by[k].gross += r.cents || 0; by[k].fee += r.feeCents || 0; });
-  const rows = Object.keys(by).map((k) => by[k]).sort((a, b) => b.fee - a.fee);
+  done.forEach((r) => { const k = r.driverId || '?'; if (!by[k]) by[k] = { name: r.driverName, n: 0, gross: 0, fee: 0, pend: 0 }; by[k].n++; by[k].gross += r.cents || 0; by[k].fee += r.feeCents || 0; if (!r.feePaid) by[k].pend += r.feeCents || 0; });
+  const rows = Object.keys(by).map((k) => by[k]).sort((a, b) => b.pend - a.pend);
+  const pend = done.filter((r) => !r.feePaid).reduce((a, r) => a + (r.feeCents || 0), 0);
   return '<div class="card"><h2>Resumo</h2><div class="kpis">' +
     '<div class="kpi"><div class="v">' + done.length + '</div><div class="l">Corridas finalizadas</div></div>' +
     '<div class="kpi"><div class="v">' + fmt(gross) + '</div><div class="l">Total movimentado</div></div>' +
     '<div class="kpi fee"><div class="v">' + fmt(fee) + '</div><div class="l">Comissão Rota10 (10%)</div></div>' +
+    '<div class="kpi fee"><div class="v">' + fmt(pend) + '</div><div class="l">A receber dos motoristas</div></div>' +
     '<div class="kpi"><div class="v">' + rides.filter((r) => ACTIVE.includes(r.status)).length + '</div><div class="l">Corridas em andamento</div></div></div></div>' +
-    '<div class="card"><h2>Taxa a receber por motorista</h2>' + (rows.length ? '<div class="tablewrap"><table><thead><tr><th>Motorista</th><th class="num">Corridas</th><th class="num">Total</th><th class="num">Taxa 10%</th></tr></thead><tbody>' +
-      rows.map((r) => '<tr><td>' + esc(r.name) + '</td><td class="num">' + r.n + '</td><td class="num">' + fmt(r.gross) + '</td><td class="num">' + fmt(r.fee) + '</td></tr>').join('') + '</tbody></table></div>' : '<p class="muted" style="margin:0">Nenhuma corrida finalizada ainda.</p>') + '</div>' +
+    '<div class="card"><h2>Taxa a receber por motorista</h2>' + (rows.length ? '<div class="tablewrap"><table><thead><tr><th>Motorista</th><th class="num">Corridas</th><th class="num">Total</th><th class="num">Taxa 10%</th><th class="num">A receber</th></tr></thead><tbody>' +
+      rows.map((r) => '<tr><td>' + esc(r.name) + '</td><td class="num">' + r.n + '</td><td class="num">' + fmt(r.gross) + '</td><td class="num">' + fmt(r.fee) + '</td><td class="num"><b>' + fmt(r.pend) + '</b></td></tr>').join('') + '</tbody></table></div>' : '<p class="muted" style="margin:0">Nenhuma corrida finalizada ainda.</p>') + '</div>' +
     '<div class="card"><h2>Últimas corridas</h2>' + (rides.length ? '<ul class="list">' + rides.slice(0, 25).map((r) =>
       '<li><div class="callrow"><span class="small muted">' + when(r) + ' · ' + esc(r.passengerName) + (r.driverName ? ' → ' + esc(r.driverName) : '') + '</span><span class="pill ' + (r.status === 'done' ? 'on' : (r.status === 'canceled' ? 'bad' : '')) + '">' + STATUS[r.status] + '</span></div>' + route(r) +
-      (r.cents ? '<div class="small">' + fmt(r.cents) + ' · taxa ' + fmt(r.feeCents) + '</div>' : '') + '</li>').join('') + '</ul>' : '<p class="muted" style="margin:0">Nenhuma corrida ainda.</p>') + '</div>';
+      (r.cents ? '<div class="small">' + fmt(r.cents) + ' · taxa ' + fmt(r.feeCents) + (r.carPlate ? ' · ' + esc(r.carPlate) : '') + '</div>' : '') +
+      (r.status === 'done' ? '<button class="link" data-act="fee-paid" data-id="' + r.id + '" data-v="' + (r.feePaid ? '0' : '1') + '">' + (r.feePaid ? '✔ Taxa recebida (desmarcar)' : 'Marcar taxa como recebida') + '</button>' : '') + '</li>').join('') + '</ul>' : '<p class="muted" style="margin:0">Nenhuma corrida ainda.</p>') + '</div>';
 }
 
 function appView() {
@@ -289,7 +420,7 @@ function appView() {
   const body = p.role === 'driver' ? driverView() : (p.role === 'admin' ? adminView() : passengerView());
   return '<header class="top"><h1>' + brand + '</h1><div class="who"><span class="pill on">' + roleName + '</span><span class="small">' + esc(p.name) + '</span><button class="link" data-act="logout">Sair</button></div></header>' +
     (S.banner ? '<p class="banner">' + esc(S.banner) + '</p>' : '') + '<main class="stack">' + body + '</main>' +
-    '<p class="foot">Versão de teste do Rota10. Pagamento direto ao motorista por enquanto.</p>';
+    '<p class="foot">Versão de teste do Rota10 (v2). Pagamento direto ao motorista por enquanto.</p>';
 }
 
 function viewHtml() {
@@ -303,15 +434,78 @@ function viewHtml() {
 const key = (i) => (i.form ? (i.form.dataset.form || '') + ':' + (i.form.dataset.id || '') + ':' : '') + i.name;
 function render() {
   const saved = {}; let activeKey = null;
-  $app.querySelectorAll('input[name]').forEach((i) => { if (i.type !== 'radio') saved[key(i)] = i.value; });
+  $app.querySelectorAll('input[name]').forEach((i) => { if (i.type !== 'radio' && i.type !== 'file') saved[key(i)] = i.value; });
   const ae = document.activeElement; if (ae && ae.name && $app.contains(ae)) activeKey = key(ae);
   $app.innerHTML = viewHtml();
   $app.querySelectorAll('input[name]').forEach((i) => {
-    if (i.type === 'radio') return;
+    if (i.type === 'radio' || i.type === 'file') return;
     const k = key(i); if (k in saved) i.value = saved[k];
     if (activeKey === k) i.focus();
   });
+  mountMap();
+  syncGps();
 }
+
+/* ---------- mapa (Leaflet + OpenStreetMap) ---------- */
+let map = null, mapEl = null, mk = {}, userMoved = false, mapRide = null;
+function setMarker(name, lat, lng, html) {
+  if (lat == null || lng == null) { if (mk[name]) { map.removeLayer(mk[name]); delete mk[name]; } return; }
+  if (mk[name]) mk[name].setLatLng([lat, lng]);
+  else mk[name] = L.marker([lat, lng], { icon: L.divIcon({ className: 'mk', html: html, iconSize: [34, 34], iconAnchor: [17, 17] }) }).addTo(map);
+}
+function updateMarkers() {
+  if (!map || !document.getElementById('mapslot') || !S.profile) return;
+  const r = activeRide(); if (!r) return;
+  if (mapRide !== r.id) { mapRide = r.id; userMoved = false; }
+  const driver = S.profile.role === 'driver';
+  const pk = r.pickupLat != null ? [r.pickupLat, r.pickupLng] : null;
+  const car = driver ? (S.myPos ? [S.myPos.lat, S.myPos.lng] : null) : (r.driverLat != null ? [r.driverLat, r.driverLng] : null);
+  setMarker('pick', pk ? pk[0] : null, pk ? pk[1] : null, '<div class="pin">📍</div>');
+  setMarker('car', car ? car[0] : null, car ? car[1] : null, '<div class="pin">🚗</div>');
+  const pts = [pk, car].filter(Boolean);
+  if (!userMoved && pts.length) { if (pts.length === 1) map.setView(pts[0], 16); else map.fitBounds(pts, { padding: [40, 40], maxZoom: 17 }); }
+  const info = document.getElementById('mapinfo'); if (info) info.textContent = mapInfoText(r);
+}
+function mountMap() {
+  const slot = document.getElementById('mapslot'); if (!slot) return;
+  if (typeof L === 'undefined') { slot.innerHTML = '<p class="small muted" style="padding:12px">Não foi possível carregar o mapa. Confira a internet.</p>'; return; }
+  if (!mapEl) {
+    mapEl = document.createElement('div'); mapEl.style.cssText = 'width:100%;height:100%';
+    map = L.map(mapEl).setView([-18.9186, -48.2772], 13);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+    ['touchstart', 'mousedown', 'wheel'].forEach((e) => mapEl.addEventListener(e, () => { userMoved = true; }, { passive: true }));
+  }
+  if (mapEl.parentNode !== slot) slot.appendChild(mapEl);
+  map.invalidateSize();
+  updateMarkers();
+}
+
+/* ---------- GPS do motorista (envia a posição durante a corrida) ---------- */
+const gps = { id: null, watch: null, last: 0, lock: null };
+function wakeLock() { try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then((l) => { gps.lock = l; }).catch(() => {}); } catch (e) {} }
+function stopGps() {
+  if (gps.watch != null && navigator.geolocation) navigator.geolocation.clearWatch(gps.watch);
+  gps.watch = null; gps.id = null; gps.last = 0; S.myPos = null;
+  try { if (gps.lock) gps.lock.release(); } catch (e) {} gps.lock = null;
+}
+function syncGps() {
+  const want = (S.profile && S.profile.role === 'driver' && S.view === 'app') ? activeRide() : null;
+  if (!want) { if (gps.id) stopGps(); return; }
+  if (gps.id === want.id) return;
+  stopGps(); gps.id = want.id;
+  if (!navigator.geolocation) { say('Este aparelho não tem localização.'); return; }
+  gps.watch = navigator.geolocation.watchPosition((pos) => {
+    S.myPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    updateMarkers();
+    const now = Date.now();
+    if (gps.id && now - gps.last >= 8000) {
+      gps.last = now;
+      updateDoc(doc(db, 'rides', gps.id), { driverLat: +S.myPos.lat.toFixed(5), driverLng: +S.myPos.lng.toFixed(5), locAt: serverTimestamp() }).catch(() => {});
+    }
+  }, () => { say('Ative a localização no navegador para o passageiro te acompanhar no mapa.'); }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 });
+  wakeLock();
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && gps.id) wakeLock(); });
 
 /* ---------- dados em tempo real ---------- */
 function stopListeners() { unsubs.forEach((u) => { try { u(); } catch (e) {} }); unsubs = []; }
@@ -332,7 +526,8 @@ function startListeners() {
 onAuthStateChanged(auth, async (u) => {
   stopListeners();
   S.user = u; S.profile = null; S.rides = []; S.open = []; S.banner = '';
-  if (!u) { S.view = 'auth'; S.mode = 'login'; S.busy = false; render(); return; }
+  S.draft = { face: null, car: null }; S.editVehicle = false; S.editEmerg = false; S.pickup = null;
+  if (!u) { stopGps(); S.view = 'auth'; S.mode = 'login'; S.busy = false; render(); return; }
   S.view = 'loading'; render();
   try {
     if (pendingProfile) {
@@ -384,27 +579,77 @@ document.addEventListener('submit', async (ev) => {
     run(() => addDoc(collection(db, 'rides'), {
       passengerId: uid, passengerName: S.profile.name, passengerPhone: S.profile.phone || '',
       from, to, note: (f.note || '').trim(), status: 'searching',
+      pickupLat: S.pickup ? S.pickup.lat : null, pickupLng: S.pickup ? S.pickup.lng : null,
       driverId: null, driverName: null, driverPhone: null, cents: null, feeCents: null, netCents: null,
       createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-    }), 'Pedido enviado. Aguarde um motorista aceitar.');
+    }).then(() => { S.pickup = null; }), 'Pedido enviado. Aguarde um motorista aceitar.');
   } else if (kind === 'accept') {
-    const cents = parseMoney(f.price);
+    const cents = parseMoney(f.price), p = S.profile;
+    if (!p.vehicleOk) { say('Cadastre seu veículo antes de aceitar corridas.'); return; }
     if (!(cents >= 300 && cents <= 100000)) { say('Informe um valor entre R$ 3,00 e R$ 1.000,00.'); return; }
     const feeCents = Math.round(cents * FEE), id = form.dataset.id;
     run(() => updateDoc(doc(db, 'rides', id), {
-      status: 'accepted', driverId: uid, driverName: S.profile.name, driverPhone: S.profile.phone || '',
+      status: 'accepted', driverId: uid, driverName: p.name, driverPhone: p.phone || '',
+      driverPhoto: p.photo, carPhoto: p.carPhoto, carBrand: p.carBrand, carModel: p.carModel, carColor: p.carColor, carPlate: p.carPlate,
       cents, feeCents, netCents: cents - feeCents, updatedAt: serverTimestamp()
     }), 'Corrida aceita. Siga até o passageiro.');
+  } else if (kind === 'vehicle') {
+    const plate = plateFmt(f.carPlate), p = S.profile;
+    if (!PLATE_RE.test(plate)) { say('Placa inválida. Exemplo: ABC1D23.'); return; }
+    const face = safeImg(S.draft.face) || safeImg(p.photo), car = safeImg(S.draft.car) || safeImg(p.carPhoto);
+    if (!face || !car) { say('Envie a sua foto e a foto do carro.'); return; }
+    const data = { carBrand: f.carBrand.trim(), carModel: f.carModel.trim(), carColor: f.carColor.trim(), carPlate: plate, photo: face, carPhoto: car, vehicleOk: true };
+    run(async () => { await updateDoc(doc(db, 'users', uid), data); Object.assign(S.profile, data); S.draft = { face: null, car: null }; S.editVehicle = false; }, 'Veículo salvo.');
+  } else if (kind === 'emerg') {
+    const phone = f.ephone.trim(), name = f.ename.trim();
+    if (phone.replace(/\D/g, '').length < 10) { say('Digite o celular com DDD.'); return; }
+    run(async () => { await updateDoc(doc(db, 'users', uid), { emergencyName: name, emergencyPhone: phone }); S.profile.emergencyName = name; S.profile.emergencyPhone = phone; S.editEmerg = false; }, 'Contato de emergência salvo.');
   }
 });
 
-document.addEventListener('change', (ev) => { if (ev.target.name === 'role') S.role = ev.target.value; });
+document.addEventListener('change', async (ev) => {
+  const t = ev.target;
+  if (t.name === 'role') S.role = t.value;
+  if (t.dataset && t.dataset.photo && t.files && t.files[0]) {
+    const kind = t.dataset.photo;
+    try { S.draft[kind] = await resizeImage(t.files[0], kind === 'face' ? 220 : 560, kind === 'face' ? 0.72 : 0.65, kind === 'face'); render(); }
+    catch (e) { say('Não consegui ler essa foto. Tente outra.'); }
+  }
+});
 
 document.addEventListener('click', (ev) => {
   const b = ev.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act;
   if (act === 'mode-login' || act === 'mode-signup') { S.mode = act === 'mode-signup' ? 'signup' : 'login'; S.err = ''; render(); }
   else if (act === 'logout') { signOut(auth); }
+  else if (act === 'edit-vehicle') { S.editVehicle = true; render(); window.scrollTo(0, 0); }
+  else if (act === 'close-vehicle') { S.editVehicle = false; S.draft = { face: null, car: null }; render(); }
+  else if (act === 'edit-emerg') { S.editEmerg = true; render(); }
+  else if (act === 'close-emerg') { S.editEmerg = false; render(); }
+  else if (act === 'recenter') { userMoved = false; updateMarkers(); }
+  else if (act === 'fee-paid') { run(() => updateDoc(doc(db, 'rides', b.dataset.id), { feePaid: b.dataset.v === '1', feePaidAt: serverTimestamp() })); }
+  else if (act === 'use-loc') {
+    if (!navigator.geolocation) { say('Este aparelho não tem localização.'); return; }
+    say('Buscando sua localização…');
+    navigator.geolocation.getCurrentPosition((pos) => {
+      S.pickup = { lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5) };
+      const inp = document.querySelector('[data-form="request"] [name="from"]');
+      if (inp && !inp.value.trim()) inp.value = 'Minha localização atual (GPS)';
+      render(); say('Localização capturada.');
+    }, () => say('Não consegui pegar sua localização. Ligue o GPS e permita no navegador.'), { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
+  }
+  else if (act === 'sos-wa') {
+    const r = activeRide(), w = waLink(S.profile.emergencyPhone); if (!w) return;
+    const go = (loc) => {
+      let t = '🚨 PRECISO DE AJUDA! Estou em uma corrida pelo Rota10.';
+      if (r && r.driverId) t += '\nMotorista: ' + r.driverName + '\nCarro: ' + [r.carBrand, r.carModel, r.carColor].filter(Boolean).join(' ') + '\nPlaca: ' + (r.carPlate || '');
+      if (r) t += '\nDe: ' + r.from + '\nPara: ' + r.to;
+      if (loc) t += '\nMinha localização: https://maps.google.com/?q=' + loc.lat + ',' + loc.lng;
+      window.location.href = w + '?text=' + encodeURIComponent(t);
+    };
+    if (!navigator.geolocation) { go(null); return; }
+    navigator.geolocation.getCurrentPosition((pos) => go({ lat: pos.coords.latitude.toFixed(5), lng: pos.coords.longitude.toFixed(5) }), () => go(null), { timeout: 6000, maximumAge: 30000, enableHighAccuracy: true });
+  }
   else if (act === 'cancel') { run(() => updateDoc(doc(db, 'rides', b.dataset.id), { status: 'canceled', updatedAt: serverTimestamp() }), 'Corrida cancelada.'); }
   else if (act === 'advance') { run(() => updateDoc(doc(db, 'rides', b.dataset.id), { status: b.dataset.to, updatedAt: serverTimestamp() }), b.dataset.to === 'done' ? 'Corrida finalizada.' : 'Atualizado.'); }
   else if (act === 'toggle-online') {
