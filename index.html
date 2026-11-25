@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B7A4D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Rota10">
+<title>Rota10</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+  :root {
+    --bg: #F2F6F3; --surface: #FFFFFF; --fg: #0F1F18; --muted: #566860; --line: #D5E0DA;
+    --brand: #0B7A4D; --brand-ink: #FFFFFF; --brand-soft: #DCF1E5;
+    --fee: #8A5D06; --fee-soft: #FAEFD3; --danger: #B3261E; --danger-soft: #FBE3E0;
+    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0B1410; --surface: #121D18; --fg: #E6F0EA; --muted: #92A89C; --line: #25352D;
+      --brand: #3CCB8B; --brand-ink: #052416; --brand-soft: #123624;
+      --fee: #E6B450; --fee-soft: #35290F; --danger: #FF8A80; --danger-soft: #3B1A18;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg); font: 15px/1.5 var(--font-body);
+    padding-block: max(16px, env(safe-area-inset-top, 0px)) calc(40px + env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .shell { max-width: 560px; margin: 0 auto; }
+  h1, h2 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+  h2 { font-size: 18px; line-height: 1.25; margin-bottom: 10px; }
+  button, input { font-family: inherit; }
+  :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+  .muted { color: var(--muted); } .small { font-size: 13px; }
+  .stack { display: grid; gap: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-width: 0; }
+  .card.hl { border: 2px solid var(--brand); }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .wordmark { font: 700 26px/1 var(--font-display); letter-spacing: -0.02em; }
+  .wordmark b { color: var(--brand); }
+  .who { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--line); color: var(--muted); }
+  .pill.on { background: var(--brand-soft); color: var(--brand); }
+  .pill.fee { background: var(--fee-soft); color: var(--fee); }
+  .pill.bad { background: var(--danger-soft); color: var(--danger); }
+  .link { appearance: none; border: 0; background: none; color: var(--brand); font: 600 14px var(--font-body); cursor: pointer; padding: 8px 4px; min-height: 40px; }
+  .btn { appearance: none; border: 1px solid transparent; border-radius: 12px; min-height: 50px; padding: 0 18px; font: 600 16px var(--font-body); cursor: pointer; width: 100%; }
+  .btn.primary { background: var(--brand); color: var(--brand-ink); }
+  .btn.ghost { background: transparent; color: var(--fg); border-color: var(--line); }
+  .btn.danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .btns { display: grid; gap: 10px; margin-top: 12px; }
+  .field { display: grid; gap: 6px; font-weight: 500; font-size: 13px; color: var(--muted); min-width: 0; margin-bottom: 12px; }
+  input[type="text"], input[type="email"], input[type="password"], input[type="tel"] {
+    font: 500 16px var(--font-body); min-height: 48px; padding: 0 12px; border: 1px solid var(--line);
+    border-radius: 10px; background: var(--surface); color: var(--fg); width: 100%;
+  }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 14px; }
+  .seg button { appearance: none; border: 0; background: transparent; color: var(--muted); font: 600 14px var(--font-body); min-height: 44px; border-radius: 9px; cursor: pointer; }
+  .seg button.on { background: var(--brand); color: var(--brand-ink); }
+  .radios { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .radios label { display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; font-weight: 600; font-size: 14px; color: var(--fg); cursor: pointer; }
+  .radios input { width: 18px; height: 18px; accent-color: var(--brand); }
+  .err { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--danger-soft); color: var(--danger); font-size: 14px; }
+  .banner { margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; background: var(--fee-soft); color: var(--fee); font-size: 14px; }
+  .route { display: grid; gap: 6px; margin: 8px 0; }
+  .route > div { display: flex; align-items: flex-start; gap: 10px; overflow-wrap: anywhere; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; margin-top: 7px; background: var(--brand); }
+  .dot.b { background: var(--fg); }
+  .callrow { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .price { font: 700 28px/1.1 var(--font-display); font-variant-numeric: tabular-nums; }
+  .note { margin: 8px 0 0; padding: 8px 10px; background: var(--bg); border-radius: 8px; font-size: 14px; overflow-wrap: anywhere; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .kpi { padding: 12px; border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+  .kpi .v { font: 700 20px/1.2 var(--font-display); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .kpi .l { font-size: 12px; color: var(--muted); }
+  .kpi.fee { background: var(--fee-soft); border-color: transparent; } .kpi.fee .v { color: var(--fee); }
+  .list { list-style: none; margin: 0; padding: 0; }
+  .list li { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .list li:last-child { border-bottom: 0; }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; min-width: 420px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { font-size: 12px; color: var(--muted); } td.num, th.num { text-align: right; }
+  .foot { margin: 18px 0 0; font-size: 12px; color: var(--muted); text-align: center; }
+  .center { min-height: 50vh; display: grid; place-items: center; color: var(--muted); }
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); max-width: min(92vw, 460px); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 14px; z-index: 20; }
+  a { color: var(--brand); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="shell"><div id="app"></div></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut }
+  from "https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, collection, query, where, onSnapshot, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB7BjOoaRldgrynspRuX_z1FsJk0Onsz6g",
+  authDomain: "rota10-b4257.firebaseapp.com",
+  projectId: "rota10-b4257",
+  storageBucket: "rota10-b4257.firebasestorage.app",
+  messagingSenderId: "61157002380",
+  appId: "1:61157002380:web:37949abb78a7ddb8e73fa9"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+/* ---------- utilidades ---------- */
+const FEE = 0.10;
+const STATUS = { searching: 'Procurando motorista', accepted: 'Motorista a caminho', arrived: 'Motorista chegou', ongoing: 'Em viagem', done: 'Finalizada', canceled: 'Cancelada' };
+const ACTIVE = ['searching', 'accepted', 'arrived', 'ongoing'];
+const NEXT = {
+  accepted: { to: 'arrived', label: 'Cheguei ao embarque' },
+  arrived: { to: 'ongoing', label: 'Iniciar corrida' },
+  ongoing: { to: 'done', label: 'Finalizar corrida' }
+};
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = (c) => ((c || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const parseMoney = (s) => { const n = parseFloat(String(s).replace(/\./g, '').replace(',', '.')); return isFinite(n) ? Math.round(n * 100) : NaN; };
+const ms = (r) => (r.createdAt && r.createdAt.toDate ? r.createdAt.toDate().getTime() : Date.now());
+const when = (r) => new Date(ms(r)).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+const waLink = (phone) => { const d = String(phone || '').replace(/\D/g, ''); if (d.length < 10) return ''; return 'https://wa.me/' + (d.length <= 11 ? '55' + d : d); };
+const friendly = (e) => {
+  const c = (e && e.code) || '';
+  const map = {
+    'auth/email-already-in-use': 'Esse e-mail já tem conta. Toque em Entrar.',
+    'auth/invalid-email': 'E-mail inválido. Confira se digitou certo.',
+    'auth/weak-password': 'Senha fraca. Use pelo menos 6 caracteres.',
+    'auth/invalid-credential': 'E-mail ou senha incorretos.',
+    'auth/wrong-password': 'E-mail ou senha incorretos.',
+    'auth/user-not-found': 'E-mail ou senha incorretos.',
+    'auth/too-many-requests': 'Muitas tentativas. Espere um pouco e tente de novo.',
+    'auth/network-request-failed': 'Sem internet. Confira a conexão e tente de novo.',
+    'auth/operation-not-allowed': 'O login por e-mail e senha não está ativado no Firebase.',
+    'auth/unauthorized-domain': 'Este endereço do site não está autorizado no Firebase (Authentication > Configurações > Domínios autorizados).',
+    'permission-denied': 'Sem permissão. Confira se as regras do Firestore foram publicadas.',
+    'unavailable': 'Sem conexão com o servidor. Tente de novo.'
+  };
+  return map[c] || ('Algo deu errado' + (c ? ' (' + c + ')' : '') + '. Tente de novo.');
+};
+
+/* ---------- estado ---------- */
+const S = { view: 'loading', mode: 'login', role: 'passenger', user: null, profile: null, rides: [], open: [], err: '', banner: '', busy: false, toast: '' };
+let pendingProfile = null;
+let unsubs = [];
+const $app = document.getElementById('app');
+const $toast = document.getElementById('toast');
+let toastTimer = null;
+function say(msg) { $toast.textContent = msg; $toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { $toast.hidden = true; }, 3500); }
+
+/* ---------- telas ---------- */
+const brand = '<span class="wordmark">Rota<b>10</b></span>';
+const route = (r) => '<div class="route"><div><span class="dot"></span><span>' + esc(r.from) + '</span></div><div><span class="dot b"></span><span>' + esc(r.to) + '</span></div></div>';
+const contact = (name, phone) => {
+  const w = waLink(phone);
+  return '<div class="small"><b>' + esc(name || '') + '</b>' + (phone ? ' · ' + esc(phone) : '') + (w ? ' · <a href="' + w + '" target="_blank" rel="noopener">WhatsApp</a>' : '') + '</div>';
+};
+
+function authView() {
+  const su = S.mode === 'signup';
+  return '<div class="top"><h1>' + brand + '</h1><span class="muted small">Dirija mais, fique com mais.</span></div>' +
+    '<div class="seg"><button data-act="mode-login" class="' + (!su ? 'on' : '') + '">Entrar</button><button data-act="mode-signup" class="' + (su ? 'on' : '') + '">Criar conta</button></div>' +
+    '<form class="card" data-form="' + (su ? 'signup' : 'login') + '" autocomplete="on">' +
+    (su ? '<label class="field">Seu nome<input type="text" name="name" autocomplete="name" required maxlength="60"></label>' +
+          '<label class="field">Celular com DDD (para o WhatsApp)<input type="tel" name="phone" autocomplete="tel" inputmode="tel" maxlength="20" placeholder="(34) 99999-9999"></label>' +
+          '<div class="radios"><label><input type="radio" name="role" value="passenger"' + (S.role === 'passenger' ? ' checked' : '') + '> Passageiro</label>' +
+          '<label><input type="radio" name="role" value="driver"' + (S.role === 'driver' ? ' checked' : '') + '> Motorista</label></div>' : '') +
+    '<label class="field">E-mail<input type="email" name="email" autocomplete="email" required></label>' +
+    '<label class="field">Senha<input type="password" name="password" autocomplete="' + (su ? 'new-password' : 'current-password') + '" required minlength="6"></label>' +
+    (S.err ? '<p class="err">' + esc(S.err) + '</p>' : '') +
+    '<button class="btn primary"' + (S.busy ? ' disabled' : '') + '>' + (S.busy ? 'Aguarde…' : (su ? 'Criar conta' : 'Entrar')) + '</button></form>' +
+    '<p class="foot">Versão de teste do Rota10 em Uberlândia.</p>';
+}
+
+function profileView() {
+  return '<div class="top"><h1>' + brand + '</h1><button class="link" data-act="logout">Sair</button></div>' +
+    '<form class="card" data-form="profile"><h2>Complete seu cadastro</h2>' +
+    '<label class="field">Seu nome<input type="text" name="name" required maxlength="60"></label>' +
+    '<label class="field">Celular com DDD<input type="tel" name="phone" inputmode="tel" maxlength="20"></label>' +
+    '<div class="radios"><label><input type="radio" name="role" value="passenger"' + (S.role === 'passenger' ? ' checked' : '') + '> Passageiro</label>' +
+    '<label><input type="radio" name="role" value="driver"' + (S.role === 'driver' ? ' checked' : '') + '> Motorista</label></div>' +
+    (S.err ? '<p class="err">' + esc(S.err) + '</p>' : '') +
+    '<button class="btn primary"' + (S.busy ? ' disabled' : '') + '>Salvar</button></form>';
+}
+
+const sorted = (list) => list.slice().sort((a, b) => ms(b) - ms(a));
+
+function passengerView() {
+  const rides = sorted(S.rides);
+  const act = rides.find((r) => ACTIVE.includes(r.status));
+  const past = rides.filter((r) => !ACTIVE.includes(r.status)).slice(0, 8);
+  let top = '';
+  if (act) {
+    top = '<div class="card hl"><div class="callrow"><h2>' + STATUS[act.status] + (act.status === 'searching' ? '…' : '') + '</h2><span class="pill on">' + when(act) + '</span></div>' + route(act) +
+      (act.driverId ? '<p class="small muted" style="margin:8px 0 2px">Seu motorista</p>' + contact(act.driverName, act.driverPhone) : '<p class="muted small">Aguardando um motorista aceitar. Pode levar alguns minutos.</p>') +
+      (act.cents ? '<div class="callrow" style="margin-top:12px"><div><div class="price">' + fmt(act.cents) + '</div><div class="small muted">Valor combinado</div></div></div>' +
+        '<p class="small muted">Neste teste o pagamento é feito direto ao motorista, por Pix ou dinheiro.</p>' : '') +
+      (['searching', 'accepted', 'arrived'].includes(act.status) ? '<div class="btns"><button class="btn danger" data-act="cancel" data-id="' + act.id + '"' + (S.busy ? ' disabled' : '') + '>Cancelar corrida</button></div>' : '') + '</div>';
+  } else {
+    top = '<form class="card" data-form="request"><h2>Para onde vamos?</h2>' +
+      '<label class="field">Embarque (rua e número, ou ponto de referência)<input type="text" name="from" required maxlength="120" autocomplete="off"></label>' +
+      '<label class="field">Destino<input type="text" name="to" required maxlength="120" autocomplete="off"></label>' +
+      '<label class="field">Observação (opcional)<input type="text" name="note" maxlength="120" autocomplete="off" placeholder="Ex.: estou de camisa azul no portão"></label>' +
+      '<p class="small muted" style="margin:0 0 4px">O motorista que aceitar define o valor da corrida. Você vê o valor aqui e pode cancelar antes de ele chegar.</p>' +
+      '<div class="btns"><button class="btn primary"' + (S.busy ? ' disabled' : '') + '>Pedir corrida</button></div></form>';
+  }
+  const hist = past.length ? '<div class="card"><h2>Corridas anteriores</h2><ul class="list">' + past.map((r) =>
+    '<li><div class="callrow"><span class="small muted">' + when(r) + '</span><span class="pill ' + (r.status === 'done' ? 'on' : 'bad') + '">' + STATUS[r.status] + '</span></div>' + route(r) +
+    (r.cents && r.status === 'done' ? '<div class="small">Valor: <b>' + fmt(r.cents) + '</b></div>' : '') + '</li>').join('') + '</ul></div>' : '';
+  return top + hist;
+}
+
+function driverView() {
+  const p = S.profile;
+  const rides = sorted(S.rides);
+  const act = rides.find((r) => ['accepted', 'arrived', 'ongoing'].includes(r.status));
+  const done = rides.filter((r) => r.status === 'done');
+  const gross = done.reduce((a, r) => a + (r.cents || 0), 0);
+  const fee = done.reduce((a, r) => a + (r.feeCents || 0), 0);
+  let html = '<div class="card"><div class="callrow"><h2 style="margin:0">Você está ' + (p.online ? 'online' : 'offline') + '</h2><span class="pill ' + (p.online ? 'on' : '') + '">' + (p.online ? 'Online' : 'Offline') + '</span></div>' +
+    '<div class="btns"><button class="btn ' + (p.online ? 'ghost' : 'primary') + '" data-act="toggle-online">' + (p.online ? 'Ficar offline' : 'Ficar online') + '</button></div></div>';
+  if (act) {
+    const nx = NEXT[act.status];
+    html += '<div class="card hl"><div class="callrow"><h2>' + STATUS[act.status] + '</h2><span class="pill on">' + fmt(act.cents) + '</span></div>' + route(act) +
+      '<p class="small muted" style="margin:8px 0 2px">Passageiro</p>' + contact(act.passengerName, act.passengerPhone) +
+      (act.note ? '<p class="note">' + esc(act.note) + '</p>' : '') +
+      '<div class="small" style="margin-top:8px">Você recebe <b>' + fmt(act.netCents) + '</b> · taxa Rota10 <b>' + fmt(act.feeCents) + '</b> (10%)</div>' +
+      '<div class="btns"><button class="btn primary" data-act="advance" data-id="' + act.id + '" data-to="' + nx.to + '"' + (S.busy ? ' disabled' : '') + '>' + nx.label + '</button></div></div>';
+  } else if (p.online) {
+    const open = sorted(S.open.filter((r) => r.status === 'searching'));
+    html += open.length ? open.map((r) =>
+      '<form class="card" data-form="accept" data-id="' + r.id + '"><div class="callrow"><b>' + esc(r.passengerName) + '</b><span class="small muted">' + when(r) + '</span></div>' + route(r) +
+      (r.note ? '<p class="note">' + esc(r.note) + '</p>' : '') +
+      '<label class="field" style="margin-top:12px">Valor da corrida (R$)<input type="text" name="price" inputmode="decimal" autocomplete="off" placeholder="Ex.: 18,00" required></label>' +
+      '<button class="btn primary"' + (S.busy ? ' disabled' : '') + '>Aceitar corrida</button></form>').join('')
+      : '<div class="card"><p class="muted" style="margin:0">Aguardando chamadas… Mantenha esta tela aberta.</p></div>';
+  } else {
+    html += '<div class="card"><p class="muted" style="margin:0">Fique online para ver os pedidos de corrida.</p></div>';
+  }
+  html += '<div class="card"><h2>Seus ganhos</h2><div class="kpis">' +
+    '<div class="kpi"><div class="v">' + done.length + '</div><div class="l">Corridas finalizadas</div></div>' +
+    '<div class="kpi"><div class="v">' + fmt(gross) + '</div><div class="l">Total das corridas</div></div>' +
+    '<div class="kpi"><div class="v">' + fmt(gross - fee) + '</div><div class="l">Você ficou com (90%)</div></div>' +
+    '<div class="kpi fee"><div class="v">' + fmt(fee) + '</div><div class="l">Taxa Rota10 a repassar (10%)</div></div></div>' +
+    '<p class="small muted" style="margin:10px 0 0">Neste teste o passageiro paga direto a você. Combine com o Evandro como repassar a taxa de 10%.</p></div>';
+  if (done.length) {
+    html += '<div class="card"><h2>Corridas finalizadas</h2><ul class="list">' + done.slice(0, 10).map((r) =>
+      '<li><div class="callrow"><span class="small muted">' + when(r) + '</span><b>' + fmt(r.cents) + '</b></div>' + route(r) + '</li>').join('') + '</ul></div>';
+  }
+  return html;
+}
+
+function adminView() {
+  const rides = sorted(S.rides);
+  const done = rides.filter((r) => r.status === 'done');
+  const gross = done.reduce((a, r) => a + (r.cents || 0), 0);
+  const fee = done.reduce((a, r) => a + (r.feeCents || 0), 0);
+  const by = {};
+  done.forEach((r) => { const k = r.driverId || '?'; if (!by[k]) by[k] = { name: r.driverName, n: 0, gross: 0, fee: 0 }; by[k].n++; by[k].gross += r.cents || 0; by[k].fee += r.feeCents || 0; });
+  const rows = Object.keys(by).map((k) => by[k]).sort((a, b) => b.fee - a.fee);
+  return '<div class="card"><h2>Resumo</h2><div class="kpis">' +
+    '<div class="kpi"><div class="v">' + done.length + '</div><div class="l">Corridas finalizadas</div></div>' +
+    '<div class="kpi"><div class="v">' + fmt(gross) + '</div><div class="l">Total movimentado</div></div>' +
+    '<div class="kpi fee"><div class="v">' + fmt(fee) + '</div><div class="l">Comissão Rota10 (10%)</div></div>' +
+    '<div class="kpi"><div class="v">' + rides.filter((r) => ACTIVE.includes(r.status)).length + '</div><div class="l">Corridas em andamento</div></div></div></div>' +
+    '<div class="card"><h2>Taxa a receber por motorista</h2>' + (rows.length ? '<div class="tablewrap"><table><thead><tr><th>Motorista</th><th class="num">Corridas</th><th class="num">Total</th><th class="num">Taxa 10%</th></tr></thead><tbody>' +
+      rows.map((r) => '<tr><td>' + esc(r.name) + '</td><td class="num">' + r.n + '</td><td class="num">' + fmt(r.gross) + '</td><td class="num">' + fmt(r.fee) + '</td></tr>').join('') + '</tbody></table></div>' : '<p class="muted" style="margin:0">Nenhuma corrida finalizada ainda.</p>') + '</div>' +
+    '<div class="card"><h2>Últimas corridas</h2>' + (rides.length ? '<ul class="list">' + rides.slice(0, 25).map((r) =>
+      '<li><div class="callrow"><span class="small muted">' + when(r) + ' · ' + esc(r.passengerName) + (r.driverName ? ' → ' + esc(r.driverName) : '') + '</span><span class="pill ' + (r.status === 'done' ? 'on' : (r.status === 'canceled' ? 'bad' : '')) + '">' + STATUS[r.status] + '</span></div>' + route(r) +
+      (r.cents ? '<div class="small">' + fmt(r.cents) + ' · taxa ' + fmt(r.feeCents) + '</div>' : '') + '</li>').join('') + '</ul>' : '<p class="muted" style="margin:0">Nenhuma corrida ainda.</p>') + '</div>';
+}
+
+function appView() {
+  const p = S.profile;
+  const roleName = { passenger: 'Passageiro', driver: 'Motorista', admin: 'Administrador' }[p.role] || p.role;
+  const body = p.role === 'driver' ? driverView() : (p.role === 'admin' ? adminView() : passengerView());
+  return '<header class="top"><h1>' + brand + '</h1><div class="who"><span class="pill on">' + roleName + '</span><span class="small">' + esc(p.name) + '</span><button class="link" data-act="logout">Sair</button></div></header>' +
+    (S.banner ? '<p class="banner">' + esc(S.banner) + '</p>' : '') + '<main class="stack">' + body + '</main>' +
+    '<p class="foot">Versão de teste do Rota10. Pagamento direto ao motorista por enquanto.</p>';
+}
+
+function viewHtml() {
+  if (S.view === 'loading') return '<div class="center">Carregando…</div>';
+  if (S.view === 'auth') return authView();
+  if (S.view === 'profile') return profileView();
+  return appView();
+}
+
+/* mantém o que a pessoa está digitando quando a tela se atualiza */
+const key = (i) => (i.form ? (i.form.dataset.form || '') + ':' + (i.form.dataset.id || '') + ':' : '') + i.name;
+function render() {
+  const saved = {}; let activeKey = null;
+  $app.querySelectorAll('input[name]').forEach((i) => { if (i.type !== 'radio') saved[key(i)] = i.value; });
+  const ae = document.activeElement; if (ae && ae.name && $app.contains(ae)) activeKey = key(ae);
+  $app.innerHTML = viewHtml();
+  $app.querySelectorAll('input[name]').forEach((i) => {
+    if (i.type === 'radio') return;
+    const k = key(i); if (k in saved) i.value = saved[k];
+    if (activeKey === k) i.focus();
+  });
+}
+
+/* ---------- dados em tempo real ---------- */
+function stopListeners() { unsubs.forEach((u) => { try { u(); } catch (e) {} }); unsubs = []; }
+function listenError(e) { S.banner = friendly(e); render(); }
+function startListeners() {
+  const uid = S.user.uid, role = S.profile.role, rides = collection(db, 'rides');
+  const snapList = (snap) => snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
+  if (role === 'admin') {
+    unsubs.push(onSnapshot(rides, (s) => { S.rides = snapList(s); S.banner = ''; render(); }, listenError));
+  } else if (role === 'driver') {
+    unsubs.push(onSnapshot(query(rides, where('driverId', '==', uid)), (s) => { S.rides = snapList(s); S.banner = ''; render(); }, listenError));
+    unsubs.push(onSnapshot(query(rides, where('status', '==', 'searching')), (s) => { S.open = snapList(s); S.banner = ''; render(); }, listenError));
+  } else {
+    unsubs.push(onSnapshot(query(rides, where('passengerId', '==', uid)), (s) => { S.rides = snapList(s); S.banner = ''; render(); }, listenError));
+  }
+}
+
+onAuthStateChanged(auth, async (u) => {
+  stopListeners();
+  S.user = u; S.profile = null; S.rides = []; S.open = []; S.banner = '';
+  if (!u) { S.view = 'auth'; S.mode = 'login'; S.busy = false; render(); return; }
+  S.view = 'loading'; render();
+  try {
+    if (pendingProfile) {
+      const pp = pendingProfile; pendingProfile = null;
+      await setDoc(doc(db, 'users', u.uid), Object.assign({}, pp, { createdAt: serverTimestamp() }));
+      S.profile = pp;
+    } else {
+      const snap = await getDoc(doc(db, 'users', u.uid));
+      S.profile = snap.exists() ? snap.data() : null;
+    }
+    S.err = '';
+  } catch (e) { pendingProfile = null; S.err = friendly(e); }
+  S.busy = false;
+  if (S.profile) { S.view = 'app'; startListeners(); } else { S.view = 'profile'; }
+  render();
+});
+
+/* ---------- ações ---------- */
+async function run(fn, okMsg) {
+  if (S.busy) return;
+  S.busy = true; render();
+  try { await fn(); if (okMsg) say(okMsg); } catch (e) { say(friendly(e)); }
+  S.busy = false; render();
+}
+
+document.addEventListener('submit', async (ev) => {
+  const form = ev.target.closest('form[data-form]'); if (!form) return;
+  ev.preventDefault();
+  const f = Object.fromEntries(new FormData(form).entries());
+  const kind = form.dataset.form, uid = S.user && S.user.uid;
+  if (kind === 'login') {
+    S.busy = true; S.err = ''; render();
+    try { await signInWithEmailAndPassword(auth, f.email.trim(), f.password); }
+    catch (e) { S.err = friendly(e); S.busy = false; render(); }
+  } else if (kind === 'signup') {
+    S.busy = true; S.err = ''; render();
+    pendingProfile = { name: f.name.trim(), phone: (f.phone || '').trim(), role: f.role === 'driver' ? 'driver' : 'passenger', online: false };
+    try { await createUserWithEmailAndPassword(auth, f.email.trim(), f.password); }
+    catch (e) { pendingProfile = null; S.err = friendly(e); S.busy = false; render(); }
+  } else if (kind === 'profile') {
+    S.busy = true; S.err = ''; render();
+    const p = { name: f.name.trim(), phone: (f.phone || '').trim(), role: f.role === 'driver' ? 'driver' : 'passenger', online: false };
+    try { await setDoc(doc(db, 'users', uid), Object.assign({}, p, { createdAt: serverTimestamp() })); S.profile = p; S.view = 'app'; startListeners(); }
+    catch (e) { S.err = friendly(e); }
+    S.busy = false; render();
+  } else if (kind === 'request') {
+    const from = f.from.trim(), to = f.to.trim();
+    if (!from || !to) return;
+    run(() => addDoc(collection(db, 'rides'), {
+      passengerId: uid, passengerName: S.profile.name, passengerPhone: S.profile.phone || '',
+      from, to, note: (f.note || '').trim(), status: 'searching',
+      driverId: null, driverName: null, driverPhone: null, cents: null, feeCents: null, netCents: null,
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    }), 'Pedido enviado. Aguarde um motorista aceitar.');
+  } else if (kind === 'accept') {
+    const cents = parseMoney(f.price);
+    if (!(cents >= 300 && cents <= 100000)) { say('Informe um valor entre R$ 3,00 e R$ 1.000,00.'); return; }
+    const feeCents = Math.round(cents * FEE), id = form.dataset.id;
+    run(() => updateDoc(doc(db, 'rides', id), {
+      status: 'accepted', driverId: uid, driverName: S.profile.name, driverPhone: S.profile.phone || '',
+      cents, feeCents, netCents: cents - feeCents, updatedAt: serverTimestamp()
+    }), 'Corrida aceita. Siga até o passageiro.');
+  }
+});
+
+document.addEventListener('change', (ev) => { if (ev.target.name === 'role') S.role = ev.target.value; });
+
+document.addEventListener('click', (ev) => {
+  const b = ev.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act;
+  if (act === 'mode-login' || act === 'mode-signup') { S.mode = act === 'mode-signup' ? 'signup' : 'login'; S.err = ''; render(); }
+  else if (act === 'logout') { signOut(auth); }
+  else if (act === 'cancel') { run(() => updateDoc(doc(db, 'rides', b.dataset.id), { status: 'canceled', updatedAt: serverTimestamp() }), 'Corrida cancelada.'); }
+  else if (act === 'advance') { run(() => updateDoc(doc(db, 'rides', b.dataset.id), { status: b.dataset.to, updatedAt: serverTimestamp() }), b.dataset.to === 'done' ? 'Corrida finalizada.' : 'Atualizado.'); }
+  else if (act === 'toggle-online') {
+    const next = !S.profile.online;
+    run(async () => { await updateDoc(doc(db, 'users', S.user.uid), { online: next }); S.profile.online = next; });
+  }
+});
+</script>
+</body>
+</html>
